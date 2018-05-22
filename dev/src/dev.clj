@@ -28,4 +28,5 @@
   "stops all states defined by defstate, reloads modified source files, and restarts the states"
   []
   (stop)
+  (start)
   (tn/refresh :after 'dev/go))
