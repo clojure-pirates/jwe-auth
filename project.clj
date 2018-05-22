@@ -9,6 +9,7 @@
                  [ring/ring-core "1.6.3"]
                  [ring/ring-jetty-adapter "1.6.3"]
                  [mount "0.1.12"]
+                 [cprop "0.1.11"]
                  [buddy/buddy-auth "2.1.0"]]
   :main jwe-auth.core
   :resource-paths ["resources" "target/resources"]

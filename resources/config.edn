@@ -1,4 +1,4 @@
 {:http {:port 3000}
  :auth
- {:backend :jws
+ {:backend :jwe
   :secret "secret123"}}
