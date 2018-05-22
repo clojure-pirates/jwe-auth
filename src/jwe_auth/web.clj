@@ -23,6 +23,9 @@
 
 (defn ok [d] {:status 200 :body d})
 (defn bad-request [d] {:status 400 :body d})
+(defn unauthenticated [] {:status 401})
+(defn unauthorized [] {:status 403})
+(defn not-found [] {:status 404})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Controllers                                      ;;
@@ -35,15 +38,14 @@
 (defn home
   [request]
   (if-not (authenticated? request)
-    (throw-unauthorized)
-    (ok {:status "Logged" :message (str "hello logged user "
-                                        (:identity request))})))
+    (unauthenticated)
+    (ok {:msg (str "Hello " (:identity request))})))
 
 ;; Global var that stores valid users with their
 ;; respective passwords.
 
-(def authdata {:admin "secret"
-               :test "secret"})
+(def auth-data {:admin "secret"
+                :test "secret"})
 
 ;; Authenticate Handler
 ;; Responds to post requests in same url as login and is responsible for
@@ -54,7 +56,7 @@
   [request]
   (let [username (get-in request [:body :username])
         password (get-in request [:body :password])
-        valid? (some-> authdata
+        valid? (some-> auth-data
                        (get (keyword username))
                        (= password))]
     (if valid?
@@ -62,7 +64,7 @@
                     :exp (time/plus (time/now) (time/seconds 3600))}
             token (jwt/encrypt claims secret {:alg :a256kw :enc :a128gcm})]
         (ok {:token token}))
-      (bad-request {:message "wrong auth data"}))))
+      (unauthenticated))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Routes and Middlewares                           ;;
@@ -72,9 +74,10 @@
 ;; Note: there are no middleware for authorization, all authorization
 ;; system is totally decoupled from main routes.
 
-(defroutes app
-           (GET "/" [] home)
-           (POST "/login" [] login))
+(def app-routes
+  (routes
+    (GET "/" [] home)
+    (POST "/login" [] login)))
 
 ;; Create an instance of auth backend.
 (def auth-backend (jwe-backend {:secret secret
@@ -85,7 +88,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defstate handler :start
-          (as-> app $
+          (as-> app-routes $
                 (wrap-authorization $ auth-backend)
                 (wrap-authentication $ auth-backend)
                 (wrap-json-response $ {:pretty false})
