@@ -4,6 +4,7 @@ Basic example with:
 - buddy-auth
 - mount
 - ring
+- compojure
 
 ## Usage
 
