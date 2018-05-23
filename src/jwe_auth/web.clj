@@ -82,25 +82,19 @@
 
 (defn home
   [request]
-  (if (authenticated? request)
-    (ok {:msg (str "Hello " (:identity request))})
-    (unauthenticated)))
+  (ok {:msg (str "Hello " (:identity request))}))
 
 (defn admin
   [request]
-  (if (authenticated? request)
-    (ok {:msg (str "Hello Admin " (:identity request))})
-    (unauthenticated)))
+  (ok {:msg (str "Hello Admin " (:identity request))}))
 
 (defn post-comment
   [request]
-  (if (authenticated? request)
-    (let [{:keys [author]} (:params request)
-          {:keys [comment]} (:body request)]
-      (if (= author (get-in request [:identity :user]))
-        (ok {:msg comment})
-        (unauthorized)))
-    (unauthenticated)))
+  (let [{:keys [author]} (:params request)
+        {:keys [comment]} (:body request)]
+    (if (= author (get-in request [:identity :user]))
+      (ok {:msg comment})
+      (unauthorized))))
 
 (defn- new-token [claims]
   (-> claims
