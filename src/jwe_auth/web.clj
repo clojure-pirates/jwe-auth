@@ -34,7 +34,7 @@
 (def opts {:alg :a256kw :enc :a128gcm})
 
 (def auth-data {:admin {:password "secret" :roles #{:admin}}
-                :test {:password "secret" :roles #{:user}}})
+                :test  {:password "secret" :roles #{:user}}})
 
 (defn- authorized-for-role?
   [request role]
@@ -68,9 +68,9 @@
 
 (defn on-error
   [request value]
-  {:status 403
+  {:status  403
    :headers {}
-   :body "Not authorized"})
+   :body    "Not authorized"})
 
 (def access-rule-opts {:rules rules :on-error on-error})
 
@@ -90,6 +90,11 @@
     (ok {:msg (str "Welcome Admin " (:identity request))})
     (unauthenticated)))
 
+(defn- new-token [claims]
+  (-> claims
+      (assoc :exp (time/plus (time/now) (time/seconds 3600)))
+      (jwt/encrypt secret opts)))
+
 (defn login
   [request]
   (let [username (get-in request [:body :username])
@@ -98,28 +103,30 @@
                        (get-in [(keyword username) :password])
                        (= password))]
     (if valid?
-      (let [claims {:user username
-                    :exp (time/plus (time/now) (time/seconds 3600))}
-            token (jwt/encrypt claims secret opts)]
+      (let [token (new-token {:user username})]
         (ok {:token token}))
       (unauthenticated))))
+
+(defn refresh-token
+  "Given an authenticated request, will generate a new token with extended
+  expiry period which the client may use on subsequent requests.
+  see: https://stackoverflow.com/questions/26739167/jwt-json-web-token-automatic-prolongation-of-expiration"
+  [request]
+  (ok {:token (new-token (:identity request))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Routes and Middleware
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; User defined application routes using compojure routing library.
-;; Note: there are no middleware for authorization, all authorization
-;; system is totally decoupled from main routes.
-
 (def app-routes
   (routes
     (GET "/" [] home)
     (GET "/admin" [] admin)
-    (POST "/login" [] login)))
+    (POST "/login" [] login)
+    (GET "/refresh" [] refresh-token)))
 
 ;; Create an instance of auth backend.
-(def auth-backend (jwe-backend {:secret secret
+(def auth-backend (jwe-backend {:secret  secret
                                 :options {:alg :a256kw :enc :a128gcm}}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
