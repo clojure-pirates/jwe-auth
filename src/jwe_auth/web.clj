@@ -16,6 +16,7 @@
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]))
 
 (def secret (nonce/random-bytes 32))
+(def opts {:alg :a256kw :enc :a128gcm})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic response helpers
@@ -31,38 +32,44 @@
 ;; Controllers                                      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Home page controller (ring handler)
-;; If incoming user is not authenticated it raises a not authenticated
-;; exception, else it simply shows a hello world message.
-
-(defn home
-  [request]
-  (if-not (authenticated? request)
-    (unauthenticated)
-    (ok {:msg (str "Hello " (:identity request))})))
-
 ;; Global var that stores valid users with their
 ;; respective passwords.
 
-(def auth-data {:admin "secret"
-                :test "secret"})
+(def auth-data {:admin {:password "secret" :roles #{:admin}}
+                :test {:password "secret" :roles #{:user}}})
 
-;; Authenticate Handler
-;; Responds to post requests in same url as login and is responsible for
-;; identifying the incoming credentials and setting the appropriate authenticated
-;; user into session. `authdata` will be used as source of valid users.
+(defn home
+  [request]
+  (if (authenticated? request)
+    (ok {:msg (str "Hello " (:identity request))})
+    (unauthenticated)))
+
+(defn authorized?
+  [request]
+  (let [token (:identity request)
+        claims (jwt/decrypt token secret opts)
+        user (get-in claims :user)
+        roles (get-in auth-data [(keyword user) :roles])
+        _ (println "-->" claims user roles)]
+    (boolean (get roles :admin))))
+
+(defn admin
+  [request]
+  (if (authorized? request)
+    (ok {:msg (str "Welcome Admin " (:identity request))})
+    (unauthenticated)))
 
 (defn login
   [request]
   (let [username (get-in request [:body :username])
         password (get-in request [:body :password])
         valid? (some-> auth-data
-                       (get (keyword username))
+                       (get-in [(keyword username) :password])
                        (= password))]
     (if valid?
       (let [claims {:user (keyword username)
                     :exp (time/plus (time/now) (time/seconds 3600))}
-            token (jwt/encrypt claims secret {:alg :a256kw :enc :a128gcm})]
+            token (jwt/encrypt claims secret opts)]
         (ok {:token token}))
       (unauthenticated))))
 
@@ -77,6 +84,7 @@
 (def app-routes
   (routes
     (GET "/" [] home)
+    (GET "/admin" [] admin)
     (POST "/login" [] login)))
 
 ;; Create an instance of auth backend.
