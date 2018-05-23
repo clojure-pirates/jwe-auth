@@ -11,12 +11,10 @@
             [clj-time.core :as time]
             [buddy.sign.jwt :as jwt]
             [buddy.core.nonce :as nonce]
-            [buddy.auth :refer [authenticated? throw-unauthorized]]
+            [buddy.auth :refer [authenticated?]]
             [buddy.auth.backends.token :refer [jwe-backend]]
-            [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]))
-
-(def secret (nonce/random-bytes 32))
-(def opts {:alg :a256kw :enc :a128gcm})
+            [buddy.auth.accessrules :refer [wrap-access-rules]]
+            [buddy.auth.middleware :refer [wrap-authentication]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic response helpers
@@ -29,14 +27,56 @@
 (defn not-found [] {:status 404})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Controllers                                      ;;
+;; Access rules
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Global var that stores valid users with their
-;; respective passwords.
+(def secret (nonce/random-bytes 32))
+(def opts {:alg :a256kw :enc :a128gcm})
 
 (def auth-data {:admin {:password "secret" :roles #{:admin}}
                 :test {:password "secret" :roles #{:user}}})
+
+(defn- authorized-for-role?
+  [request role]
+  (let [claims (:identity request)
+        user (:user claims)
+        roles (get-in auth-data [(keyword user) :roles])]
+    (boolean (get roles role))))
+
+(defn any-access [request]
+  (println "any-access")
+  true)
+
+(defn admin-access [request]
+  (println "admin-access")
+  (authorized-for-role? request :admin))
+
+(defn operator-access [request]
+  (println "operator-access")
+  (authorized-for-role? request :operator))
+
+(defn authenticated-access [request]
+  (println "authenticated-access")
+  (authenticated? request))
+
+(def rules [{:pattern #"^/admin[\/]*.*"
+             :handler {:or [admin-access operator-access]}}
+            {:pattern #"^/login$"
+             :handler any-access}
+            {:pattern #"^/.*"
+             :handler authenticated-access}])
+
+(defn on-error
+  [request value]
+  {:status 403
+   :headers {}
+   :body "Not authorized"})
+
+(def access-rule-opts {:rules rules :on-error on-error})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Controllers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn home
   [request]
@@ -44,18 +84,9 @@
     (ok {:msg (str "Hello " (:identity request))})
     (unauthenticated)))
 
-(defn authorized?
-  [request]
-  (let [token (:identity request)
-        claims (jwt/decrypt token secret opts)
-        user (get-in claims :user)
-        roles (get-in auth-data [(keyword user) :roles])
-        _ (println "-->" claims user roles)]
-    (boolean (get roles :admin))))
-
 (defn admin
   [request]
-  (if (authorized? request)
+  (if (authenticated? request)
     (ok {:msg (str "Welcome Admin " (:identity request))})
     (unauthenticated)))
 
@@ -67,14 +98,14 @@
                        (get-in [(keyword username) :password])
                        (= password))]
     (if valid?
-      (let [claims {:user (keyword username)
+      (let [claims {:user username
                     :exp (time/plus (time/now) (time/seconds 3600))}
             token (jwt/encrypt claims secret opts)]
         (ok {:token token}))
       (unauthenticated))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Routes and Middlewares                           ;;
+;; Routes and Middleware
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; User defined application routes using compojure routing library.
@@ -97,7 +128,7 @@
 
 (defstate handler :start
           (as-> app-routes $
-                (wrap-authorization $ auth-backend)
+                (wrap-access-rules $ access-rule-opts)
                 (wrap-authentication $ auth-backend)
                 (wrap-json-response $ {:pretty false})
                 (wrap-json-body $ {:keywords? true :bigdecimals? true})))
