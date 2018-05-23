@@ -1,10 +1,8 @@
 (ns jwe-auth.core
   (:require [mount.core :as mount :refer [defstate]]
-            [cprop.core :refer [load-config]]
             [ring.adapter.jetty :refer [run-jetty]]
+            [jwe-auth.env :refer [config]]
             [jwe-auth.web :refer [handler]]))
-
-(defstate config :start (load-config))
 
 (defn start-app
   [{:keys [http]}]

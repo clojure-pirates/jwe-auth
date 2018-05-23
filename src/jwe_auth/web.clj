@@ -1,6 +1,5 @@
 (ns jwe-auth.web
-  (:require [mount.core :as mount :refer [defstate]]
-            [compojure.route :as route]
+  (:require [compojure.route :as route]
             [compojure.core :refer :all]
             [compojure.response :refer [render]]
             [clojure.java.io :as io]
@@ -14,24 +13,29 @@
             [buddy.auth :refer [authenticated?]]
             [buddy.auth.backends.token :refer [jwe-backend]]
             [buddy.auth.accessrules :refer [wrap-access-rules]]
-            [buddy.auth.middleware :refer [wrap-authentication]]))
+            [buddy.auth.middleware :refer [wrap-authentication]]
+            [mount.core :refer [defstate]]
+            [jwe-auth.env :refer [config]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic response helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- error [status msg]
+  {:status status :body {:msg msg}})
 (defn ok [d] {:status 200 :body d})
-(defn bad-request [d] {:status 400 :body d})
-(defn unauthenticated [] {:status 401})
-(defn unauthorized [] {:status 403})
-(defn not-found [] {:status 404})
+(defn bad-request [d] (error 400 d))
+(defn unauthenticated [] (error 401 "Not authenticated"))
+(defn unauthorized [] (error 403 "Not authorized"))
+(defn not-found [] (error 404 "Not found"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Access rules
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def secret (nonce/random-bytes 32))
-(def opts {:alg :a256kw :enc :a128gcm})
+(defstate secret :start (nonce/random-bytes 32))
+(defstate auth-backend :start (jwe-backend (assoc (:auth config) :secret secret)))
+(defstate jwt-encrypt :start #(jwt/encrypt % secret (get-in config [:auth :options])))
 
 (def auth-data {:admin {:password "secret" :roles #{:admin}}
                 :test  {:password "secret" :roles #{:user}}})
@@ -44,19 +48,19 @@
     (boolean (get roles role))))
 
 (defn any-access [request]
-  (println "any-access")
+  (println "any-access uri:" (:uri request))
   true)
 
 (defn admin-access [request]
-  (println "admin-access")
+  (println "admin-access uri:" (:uri request))
   (authorized-for-role? request :admin))
 
 (defn operator-access [request]
-  (println "operator-access")
+  (println "operator-access uri:" (:uri request))
   (authorized-for-role? request :operator))
 
 (defn authenticated-access [request]
-  (println "authenticated-access")
+  (println "authenticated-access uri:" (:uri request))
   (authenticated? request))
 
 (def rules [{:pattern #"^/admin[\/]*.*"
@@ -66,13 +70,11 @@
             {:pattern #"^/.*"
              :handler authenticated-access}])
 
-(defn on-error
-  [request value]
-  {:status  403
-   :headers {}
-   :body    "Not authorized"})
+(defn access-error
+  [_request _value]
+  (unauthorized))
 
-(def access-rule-opts {:rules rules :on-error on-error})
+(def access-rule-opts {:rules rules :on-error access-error})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Controllers
@@ -87,13 +89,23 @@
 (defn admin
   [request]
   (if (authenticated? request)
-    (ok {:msg (str "Welcome Admin " (:identity request))})
+    (ok {:msg (str "Hello Admin " (:identity request))})
+    (unauthenticated)))
+
+(defn post-comment
+  [request]
+  (if (authenticated? request)
+    (let [{:keys [author]} (:params request)
+          {:keys [comment]} (:body request)]
+      (if (= author (get-in request [:identity :user]))
+        (ok {:msg comment})
+        (unauthorized)))
     (unauthenticated)))
 
 (defn- new-token [claims]
   (-> claims
       (assoc :exp (time/plus (time/now) (time/seconds 3600)))
-      (jwt/encrypt secret opts)))
+      jwt-encrypt))
 
 (defn login
   [request]
@@ -122,12 +134,9 @@
   (routes
     (GET "/" [] home)
     (GET "/admin" [] admin)
+    (POST "/author/:author/comment" [] post-comment)
     (POST "/login" [] login)
     (GET "/refresh" [] refresh-token)))
-
-;; Create an instance of auth backend.
-(def auth-backend (jwe-backend {:secret  secret
-                                :options {:alg :a256kw :enc :a128gcm}}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry Point
