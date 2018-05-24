@@ -1,21 +1,20 @@
 (ns jwe-auth.web
-  (:require [compojure.route :as route]
-            [compojure.core :refer :all]
-            [compojure.response :refer [render]]
-            [clojure.java.io :as io]
-            [ring.util.response :refer [response redirect content-type]]
-            [ring.middleware.session :refer [wrap-session]]
-            [ring.middleware.params :refer [wrap-params]]
-            [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
-            [clj-time.core :as time]
-            [buddy.sign.jwt :as jwt]
-            [buddy.core.nonce :as nonce]
-            [buddy.auth :refer [authenticated?]]
-            [buddy.auth.backends.token :refer [jwe-backend]]
-            [buddy.auth.accessrules :refer [wrap-access-rules]]
-            [buddy.auth.middleware :refer [wrap-authentication]]
-            [mount.core :refer [defstate]]
-            [jwe-auth.env :refer [config]]))
+  (:require
+    [compojure.core :refer :all]
+    [compojure.response :refer [render]]
+    [clojure.java.io :as io]
+    [ring.util.response :refer [response redirect content-type]]
+    [ring.middleware.session :refer [wrap-session]]
+    [ring.middleware.params :refer [wrap-params]]
+    [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
+    [clj-time.core :as time]
+    [buddy.sign.jwt :as jwt]
+    [buddy.core.nonce :as nonce]
+    [buddy.auth :refer [authenticated?]]
+    [buddy.auth.backends.token :refer [jwe-backend]]
+    [buddy.auth.middleware :refer [wrap-authentication]]
+    [mount.core :refer [defstate]]
+    [jwe-auth.env :refer [config]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic response helpers
@@ -24,10 +23,8 @@
 (defn- error [status msg]
   {:status status :body {:msg msg}})
 (defn ok [d] {:status 200 :body d})
-(defn bad-request [d] (error 400 d))
 (defn unauthenticated [] (error 401 "Not authenticated"))
 (defn unauthorized [] (error 403 "Not authorized"))
-(defn not-found [] (error 404 "Not found"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Access rules
@@ -55,30 +52,20 @@
   (println "admin-access uri:" (:uri request))
   (authorized-for-role? request :admin))
 
-(defn operator-access [request]
-  (println "operator-access uri:" (:uri request))
-  (authorized-for-role? request :operator))
-
 (defn authenticated-access [request]
   (println "authenticated-access uri:" (:uri request))
   (authenticated? request))
 
-(def rules [{:pattern #"^/admin[\/]*.*"
-             :handler {:or [admin-access operator-access]}}
-            {:pattern #"^/login$"
-             :handler any-access}
-            {:pattern #"^/.*"
-             :handler authenticated-access}])
-
-(defn access-error
-  [_request _value]
-  (unauthorized))
-
-(def access-rule-opts {:rules rules :on-error access-error})
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Controllers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn mk-handler
+  [h has-access]
+  (fn [request]
+    (if (has-access request)
+      (h request)
+      (unauthorized))))
 
 (defn home
   [request]
@@ -126,11 +113,11 @@
 
 (def app-routes
   (routes
-    (GET "/" [] home)
-    (GET "/admin" [] admin)
-    (POST "/author/:author/comment" [] post-comment)
+    (GET "/" [] (mk-handler home authenticated-access))
+    (GET "/admin" [] (mk-handler admin admin-access))
+    (POST "/author/:author/comment" [] (mk-handler post-comment authenticated-access))
     (POST "/login" [] login)
-    (GET "/refresh" [] refresh-token)))
+    (GET "/refresh" [] (mk-handler refresh-token authenticated-access))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry Point
@@ -138,7 +125,6 @@
 
 (defstate handler :start
           (as-> app-routes $
-                (wrap-access-rules $ access-rule-opts)
                 (wrap-authentication $ auth-backend)
                 (wrap-json-response $ {:pretty false})
                 (wrap-json-body $ {:keywords? true :bigdecimals? true})))
