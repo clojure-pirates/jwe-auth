@@ -5,20 +5,22 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [org.clojure/tools.namespace "0.2.11"]
-                 [ring/ring-core "1.6.3"]
-                 [ring/ring-json "0.4.0"]
-                 [ring/ring-jetty-adapter "1.6.3"]
-                 [compojure "1.6.1"]
+
                  [mount "0.1.12"]
                  [cprop "0.1.11"]
-                 [buddy/buddy-auth "2.1.0"]]
+                 [clj-time "0.14.4"]
+
+                 [io.pedestal/pedestal.service "0.5.3"]
+                 [io.pedestal/pedestal.jetty "0.5.3"]
+
+                 [buddy/buddy-auth "2.1.0"]
+                 [buddy/buddy-hashers "1.3.0"]]
   :main jwe-auth.core
   :resource-paths ["resources" "target/resources"]
   :profiles
   {:dev [:project/dev :profiles/dev]
    :repl {:repl-options {:init-ns user}}
-   :profiles/dev {}
+   :profiles/dev {:dependencies [[org.clojure/tools.namespace "0.2.11"]]}
    :project/dev {:source-paths ["dev/src"]
                  :resource-paths ["dev/resources"]}})
 

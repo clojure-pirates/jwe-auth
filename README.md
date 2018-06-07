@@ -3,20 +3,32 @@
 Basic example with:
 - buddy-auth
 - mount
-- ring
-- compojure
+- pedestal
 
 ## Usage
 ```sh
-$ http -v post :3000/login username=admin password=secret
+$ http -v :3000/login username=admin password=secret
 HTTP/1.1 200 OK
 ...
 {
     "token": "xxx"
 }
 
-$ http :3000 Authorization:"Token xxx"
+$ http :3000/admin Authorization:"Token xxx"
 HTTP/1.1 200 OK
+
+$ http -v :3000/login username=test password=secret
+HTTP/1.1 200 OK
+...
+{
+    "token": "yyy"
+}
+
+$ http :3000/author/test/comment comment=foo Authorization:"Token yyy"
+HTTP/1.1 200 OK
+{
+    "msg": "foo"
+}
 ```
 ## License
 

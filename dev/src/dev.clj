@@ -1,8 +1,8 @@
 (ns dev
-  (:require [clojure.pprint :refer [pprint]]
-            [clojure.tools.namespace.repl :as tn]
-            [mount.core :as mount :refer [defstate]]
-            [jwe-auth.core :as jwe-auth]))
+  (:require [clojure.tools.namespace.repl :as tn]
+            [mount.core :as mount]
+            [jwe-auth.env :refer [config]]
+            [jwe-auth.pedestal :refer [server service-map]]))
 
 (defn start []
   (mount/start))
