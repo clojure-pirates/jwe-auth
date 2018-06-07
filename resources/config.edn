@@ -1,3 +1,0 @@
-{:http {:port 3000}
- :auth
- {:options {:alg :a256kw :enc :a128gcm}}}

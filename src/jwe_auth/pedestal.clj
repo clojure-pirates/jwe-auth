@@ -13,7 +13,7 @@
   {:env :dev
    ::http/routes routes/routes
    ::http/type :jetty
-   ::http/port 3001
+   ::http/port 3000
    ::http/join? false})
 
 (defstate service-map

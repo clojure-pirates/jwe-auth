@@ -6,6 +6,9 @@
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.9.0"]
 
+                 [ch.qos.logback/logback-classic "1.1.8" :exclusions [org.slf4j/slf4j-api]]
+                 [org.slf4j/log4j-over-slf4j "1.7.25"]
+
                  [mount "0.1.12"]
                  [cprop "0.1.11"]
                  [clj-time "0.14.4"]
@@ -16,11 +19,10 @@
                  [buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-hashers "1.3.0"]]
   :main jwe-auth.core
-  :resource-paths ["resources" "target/resources"]
+  :resource-paths ["resources" "config"]
   :profiles
-  {:dev [:project/dev :profiles/dev]
-   :repl {:repl-options {:init-ns user}}
-   :profiles/dev {:dependencies [[org.clojure/tools.namespace "0.2.11"]]}
-   :project/dev {:source-paths ["dev/src"]
-                 :resource-paths ["dev/resources"]}})
+  {:dev {:source-paths ["dev/src"]
+         :resource-paths ["dev/resources" "dev/config"]
+         :dependencies [[org.clojure/tools.namespace "0.2.11"]]}
+   :repl {:repl-options {:init-ns user}}})
 
