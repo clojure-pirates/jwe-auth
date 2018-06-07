@@ -16,6 +16,7 @@
                        ::http/type :jetty
                        ::http/port 3001
                        ::http/join? false})
+
 (deftest home-page-test
   (let [_ (mount/start-with {#'jwe-auth.pedestal/service-map test-service-map})
         {:keys [status body headers]} (response-for (::http/service-fn server)

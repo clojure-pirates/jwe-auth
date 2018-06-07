@@ -10,7 +10,7 @@
                  [org.slf4j/log4j-over-slf4j "1.7.25"]
 
                  [mount "0.1.12"]
-                 [cprop "0.1.11"]
+                 [environ "1.1.0"]
                  [clj-time "0.14.4"]
 
                  [io.pedestal/pedestal.service "0.5.3"]

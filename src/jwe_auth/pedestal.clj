@@ -1,5 +1,6 @@
 (ns jwe-auth.pedestal
   (:require [mount.core :refer [defstate]]
+            [environ.core :refer [env]]
             [io.pedestal.http :as http]
             [io.pedestal.interceptor :refer [interceptor interceptor-name]]
             [jwe-auth.routes :as routes]))
@@ -10,10 +11,10 @@
 
 (defn pedestal-config
   []
-  {:env :dev
+  {:env :prod
    ::http/routes routes/routes
    ::http/type :jetty
-   ::http/port 8080
+   ::http/port (Integer/parseInt (env :port))
    ::http/join? false})
 
 (defstate service-map

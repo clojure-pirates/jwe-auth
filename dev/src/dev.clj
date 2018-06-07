@@ -1,11 +1,18 @@
 (ns dev
   (:require [clojure.tools.namespace.repl :as tn]
             [mount.core :as mount]
-            [jwe-auth.env :refer [config]]
-            [jwe-auth.pedestal :refer [server service-map]]))
+            [io.pedestal.http :as http]
+            [jwe-auth.pedestal :refer [server]]
+            [jwe-auth.routes :as routes]))
+
+(def dev-service-map {:env :dev
+                      ::http/routes routes/routes
+                      ::http/type :jetty
+                      ::http/port 3000
+                      ::http/join? false})
 
 (defn start []
-  (mount/start))
+  (mount/start-with {#'jwe-auth.pedestal/service-map dev-service-map}))
 
 (defn stop []
   (mount/stop))
