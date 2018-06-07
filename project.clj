@@ -24,5 +24,12 @@
   {:dev {:source-paths ["dev/src"]
          :resource-paths ["dev/resources" "dev/config"]
          :dependencies [[org.clojure/tools.namespace "0.2.11"]]}
-   :repl {:repl-options {:init-ns user}}})
+
+   :repl {:repl-options {:init-ns user}}
+
+   :uberjar {:omit-source true
+             :aot :all
+             :uberjar-name "jwe-auth.jar"
+             :source-paths ["src"]
+             :resource-paths ["resources" "config"]}})
 

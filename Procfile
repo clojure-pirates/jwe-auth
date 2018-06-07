@@ -1,0 +1,1 @@
+web: java -cp target/jwe-auth.jar clojure.main -m jwe-auth.core
