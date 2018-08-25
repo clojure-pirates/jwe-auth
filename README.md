@@ -6,6 +6,22 @@ Basic example with:
 - pedestal
 
 ## Usage
+
+
+- Export the `PORT` environment variable 
+
+```sh
+export PORT=3000
+```
+
+- Start the server with 
+
+```
+lein run 
+```
+
+- Test the APIs by using `HTTPie` examples below
+
 ```sh
 $ http -v :3000/login username=admin password=secret
 HTTP/1.1 200 OK
